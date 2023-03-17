@@ -159,11 +159,69 @@ class Onitama:
 
         return None
 
+    def validate_input(self, move_input: str) -> Tuple[bool, str]:
+        parts = move_input.split()
+
+        if len(parts) != 5:
+            return (
+                False,
+                "Invalid input format. Please enter the card name, piece coordinates (x, y), and target coordinates (x, y).",
+            )
+
+        card_name, x, y, nx, ny = parts
+
+        if not (x.isdigit() and y.isdigit() and nx.isdigit() and ny.isdigit()):
+            return (
+                False,
+                "Invalid coordinates. Please use integers for the coordinates.",
+            )
+
+        x, y, nx, ny = int(x), int(y), int(nx), int(ny)
+
+        if not (0 <= x < 5 and 0 <= y < 5 and 0 <= nx < 5 and 0 <= ny < 5):
+            return (
+                False,
+                "Invalid coordinates. All coordinates must be between 0 and 4.",
+            )
+
+        current_player_cards = (
+            [card.name for card in self.red_cards]
+            if self.current_player.color == Color.RED
+            else [card.name for card in self.blue_cards]
+        )
+
+        if card_name not in current_player_cards:
+            return (
+                False,
+                f"Invalid card name. Available cards for current player: {current_player_cards}",
+            )
+
+        piece = self.board[y][x]
+        if piece is None:
+            return (
+                False,
+                "No piece at the given coordinates. Please choose a piece to move.",
+            )
+
+        if piece.color != self.current_player.color:
+            return (
+                False,
+                "The selected piece does not belong to the current player. Please choose a piece of your own color.",
+            )
+
+        return True, ""
+
     def prompt_move(self):
         while True:
             move_input = input(
                 "Enter the card name, piece coordinates (x, y), and target coordinates (x, y): "
             )
+
+            valid_input, error_message = self.validate_input(move_input)
+            if not valid_input:
+                print(error_message)
+                continue
+
             card_name, x, y, nx, ny = move_input.split()
             x, y, nx, ny = int(x), int(y), int(nx), int(ny)
 
