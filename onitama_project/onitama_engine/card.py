@@ -1,6 +1,6 @@
 from typing import List, Tuple
 
-from move import Move
+from .move import Move
 
 
 class Card:

@@ -1,4 +1,4 @@
-from constants import Color
+from .constants import Color
 
 
 class Player:

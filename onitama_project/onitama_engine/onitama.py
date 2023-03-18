@@ -1,10 +1,10 @@
 import random
 from typing import List, Optional, Tuple
 
-from card import Card
-from constants import Color
-from piece import Piece, Rank
-from player import Player
+from .card import Card
+from .constants import Color
+from .piece import Piece, Rank
+from .player import Player
 
 
 class Onitama:
@@ -236,18 +236,25 @@ class Onitama:
             else:
                 print("Invalid move. Please try again.")
 
+    def get_game_state(self):
+        return {
+            "board": self.board,
+            "current_player": self.current_player,
+            "red_cards": [card.name for card in self.red_cards],
+            "blue_cards": [card.name for card in self.blue_cards],
+            "neutral_card": self.neutral_card.name,
+        }
 
-if __name__ == "__main__":
-    game = Onitama()
-    while True:
-        game.display_board()
-        print(f"Current player: {repr(game.current_player)}")
-        print(f"Red cards: {[card.name for card in game.red_cards]}")
-        print(f"Blue cards: {[card.name for card in game.blue_cards]}")
-        print(f"Neutral card: '{game.neutral_card.name}'")
+    def play(self):
+        while True:
+            self.display_board()
+            print(f"Current player: {repr(self.current_player)}")
+            print(f"Red cards: {[card.name for card in self.red_cards]}")
+            print(f"Blue cards: {[card.name for card in self.blue_cards]}")
+            print(f"Neutral card: '{self.neutral_card.name}'")
 
-        card_name, x, y, nx, ny = game.prompt_move()
-        winner = game.make_move(card_name, x, y, nx, ny)
-        if winner is not None:
-            print(f"{repr(winner)} wins!")
-            break
+            card_name, x, y, nx, ny = self.prompt_move()
+            winner = self.make_move(card_name, x, y, nx, ny)
+            if winner is not None:
+                print(f"{repr(winner)} wins!")
+                break

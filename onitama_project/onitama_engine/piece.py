@@ -1,7 +1,7 @@
 from enum import Enum, auto
 
-from constants import Color
-from move import Move
+from .constants import Color
+from .move import Move
 
 
 class Rank(Enum):
