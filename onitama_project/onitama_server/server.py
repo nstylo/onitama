@@ -173,7 +173,8 @@ async def start_game(game_id: GameID, player_id: PlayerID):
 
 @app.websocket("/ws/{game_id}")
 async def websocket_endpoint(websocket: WebSocket, game_id: GameID):
-    game = game_manager.get_game(game_id).game
+    game_wrapper = game_manager.get_game(game_id)
+    game = game_wrapper.game
     if not game:
         return
 
@@ -183,6 +184,17 @@ async def websocket_endpoint(websocket: WebSocket, game_id: GameID):
         while True:
             ws_msg = await websocket.receive_json()
             move_input = ws_msg["move_input"]
+            player_id = UUID(ws_msg["player_id"])
+
+            if player_id != game_wrapper.current_player:
+                await websocket.send_json(
+                    {
+                        "type": "error",
+                        "status": "error",
+                        "message": "It's not your turn.",
+                    }
+                )
+                continue
 
             valid_move, msg = game.validate_input(
                 move_input["card_name"],
