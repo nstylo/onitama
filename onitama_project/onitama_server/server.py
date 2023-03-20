@@ -1,7 +1,7 @@
 import random
 import sys
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 from uuid import UUID, uuid4
 
 import uvicorn
@@ -28,20 +28,34 @@ class Player(BaseModel):
 
 class GameWrapper:
     def __init__(self, onitama_game: Onitama):
-        self.game = onitama_game
+        self.game: Onitama = onitama_game
         self.players: Dict[PlayerID, Player] = {}
-        self.available_colors = list(Color)
+        self.host: Optional[PlayerID] = None
+        self.available_colors: List[Color] = list(Color)
+        self.current_player: Optional[PlayerID] = None
+        self.started: bool = False
 
     def add_player(self, player: Player):
         self.players[player.id] = player
         self.available_colors.remove(player.color)
 
+        if self.num_players == 1:
+            self.host = player.id
+
     def assign_random_color(self) -> Color:
         return random.choice(self.available_colors)
 
+    def start(self):
+        self.current_player = random.choice(list(self.players.keys()))
+        self.started = True
+
     @property
     def is_full(self):
-        return len(self.players) >= 2
+        return self.num_players >= 2
+
+    @property
+    def num_players(self):
+        return len(self.players)
 
 
 class GameManager:
@@ -127,6 +141,36 @@ def game_state(game_id: GameID):
     return game.get_game_state()
 
 
+@app.post("/start_game/{game_id}")
+async def start_game(game_id: GameID, player_id: PlayerID):
+    game_wrapper = game_manager.games.get(game_id)
+    if not game_wrapper:
+        raise HTTPException(status_code=404, detail="Game not found")
+
+    if not game_wrapper.is_full:
+        raise HTTPException(
+            status_code=400, detail="Two players are required to start the game"
+        )
+
+    if player_id != game_wrapper.host:
+        raise HTTPException(
+            status_code=403, detail="You are not allowed to start the game."
+        )
+
+    game_wrapper.start()
+
+    start_message = {
+        "type": "game_started",
+        "status": "game_started",
+        "message": "The game has started",
+        "current_player": game_wrapper.current_player,
+    }
+
+    await websocket_manager.broadcast_game_state(game_id, start_message)
+
+    return {"status": "success", "message": "The game has been started"}
+
+
 @app.websocket("/ws/{game_id}")
 async def websocket_endpoint(websocket: WebSocket, game_id: GameID):
     game = game_manager.get_game(game_id).game
@@ -137,7 +181,9 @@ async def websocket_endpoint(websocket: WebSocket, game_id: GameID):
 
     try:
         while True:
-            move_input = await websocket.receive_json()
+            ws_msg = await websocket.receive_json()
+            move_input = ws_msg["move_input"]
+
             valid_move, msg = game.validate_input(
                 move_input["card_name"],
                 move_input["x"],
@@ -147,7 +193,9 @@ async def websocket_endpoint(websocket: WebSocket, game_id: GameID):
             )
 
             if not valid_move:
-                await websocket.send_json({"status": "error", "message": msg})
+                await websocket.send_json(
+                    {"type": "error", "status": "error", "message": msg}
+                )
             else:
                 winner = game.make_move(
                     move_input["card_name"],
@@ -158,6 +206,7 @@ async def websocket_endpoint(websocket: WebSocket, game_id: GameID):
                 )
 
                 updated_game_state = game.get_game_state()
+                updated_game_state["type"] = "game_state_updated"
                 updated_game_state["status"] = "success"
                 updated_game_state["winner"] = winner
 
